@@ -1,24 +1,27 @@
 #!/usr/bin/env bash
 echo "Cloning dependencies"
-git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+git clone --depth=1 https://github.com/KazuDante89/Tea-Kernel-Lavender -b Redneval kernel
+cd kernel
+git clone https://github.com/arter97/arm64-gcc --depth=1
+git clone https://github.com/arter97/arm32-gcc --depth=1
 git clone --depth=1 https://github.com/KazuDante89/AnyKernel3-EAS -b lavender2 AnyKernel
 echo "Done"
 IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 TANGGAL=$(date +"%F-%S")
 START=$(date +"%s")
-KERNEL_DIR=$(pwd)
-PATH="${PWD}/clang/bin:$PATH"
-export KBUILD_COMPILER_STRING="$(${KERNEL_DIR}/clang/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')"
+export CONFIG_PATH=$PWD/arch/arm64/configs/tea-old_defconfig
+PATH="$(pwd)/arm64-gcc/bin:$(pwd)/arm32-gcc/bin:${PATH}" \
 export ARCH=arm64
+export USE_CCACHE=1
 export KBUILD_BUILD_HOST=circleci
-export KBUILD_BUILD_USER="kazudante89"
+export KBUILD_BUILD_USER="Kazu"
 # Send info plox channel
 function sendinfo() {
     curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
         -d chat_id="$chat_id" \
         -d "disable_web_page_preview=true" \
         -d "parse_mode=html" \
-        -d text="<b>• 4.4 Redneval Kernel Project •</b>%0ABuild started on <code>Circle CI</code>%0AFor device <b>Xiaomi Redmi Note7/7S</b> (lavender)%0Abranch <code>$(git rev-parse --abbrev-ref HEAD)</code>(master)%0AUnder commit <code>$(git log --pretty=format:'"%h : %s"' -1)</code>%0AUsing compiler: <code>${KBUILD_COMPILER_STRING}</code>%0AStarted on <code>$(date)</code>%0A<b>Build Status:</b>#Stable"
+        -d text="<b>• Redneval Kernel •</b>%0ABuild started on <code>Circle CI</code>%0AFor device <b>Xiaomi Redmi Note7/7S</b> (lavender)%0Abranch <code>$(git rev-parse --abbrev-ref HEAD)</code>(master)%0AUnder commit <code>$(git log --pretty=format:'"%h : %s"' -1)</code>%0AUsing compiler: <code>$(${GCC}gcc --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')</code>%0AStarted on <code>$(date)</code>%0A<b>Build Status:</b>#Stable"
 }
 # Push kernel to channel
 function push() {
@@ -36,28 +39,23 @@ function finerr() {
         -d chat_id="$chat_id" \
         -d "disable_web_page_preview=true" \
         -d "parse_mode=markdown" \
-        -d text="Build failed, check the circleci logs"
+        -d text="Build throw an error(s)"
     exit 1
 }
 # Compile plox
 function compile() {
-    make O=out ARCH=arm64 tea-old_defconfig
-    make -j$(nproc --all) O=out \
-                          ARCH=arm64 \
-			                    CC=clang \
-			                    CROSS_COMPILE=aarch64-linux-gnu- \
-			                    CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-
-    if ! [ -a "$IMAGE" ]; then
-        finerr
-        exit 1
-    fi
-    cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
+   make O=out ARCH=arm64 tea-old_defconfig
+     PATH="$(pwd)/arm64-gcc/bin:$(pwd)/arm32-gcc/bin:${PATH}" \
+       make -j$(nproc --all) O=out \
+                             ARCH=arm64 \
+                             CROSS_COMPILE=aarch64-elf- \
+                             CROSS_COMPILE_ARM32=arm-eabi-
+   cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
 }
 # Zipping
 function zipping() {
     cd AnyKernel || exit 1
-    zip -r9 Redneval_v.0.0.zip *
+    zip -r9 Redneval_v0.0.0.zip *
     cd ..
 }
 sendinfo
